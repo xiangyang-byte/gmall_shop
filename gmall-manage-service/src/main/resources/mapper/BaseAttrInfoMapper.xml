@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper SYSTEM "http://mybatis.org/dtd/mybatis-3-mapper.dtd" >
+<!--namespace:接口全路径-->
+<mapper namespace="com.atguigu.gmall.manage.mapper.BaseAttrInfoMapper">
+
+    <resultMap id="baseAttrInfoMapperMap" type="com.atguigu.gmall.bean.BaseAttrInfo" autoMapping="true">
+        <!--property:实体类属性值
+            column: 表中字段。
+        -->
+        <id property="id" column="id"></id>
+        <!--collection:一对多查询
+           association:多对一查询
+        -->
+        <collection property="attrValueList" ofType="com.atguigu.gmall.bean.BaseAttrValue" autoMapping="true">
+            <result property="id" column="attr_value_id"></result>
+        </collection>
+    </resultMap>
+    <select id="getBaseAttrInfoListByCatalog3Id" resultMap="baseAttrInfoMapperMap">
+        SELECT
+            ba.id,
+            ba.attr_name,
+            ba.catalog3_id,
+            bav.id attr_value_id,
+            bav.value_name,
+            bav.attr_id
+        FROM base_attr_info ba
+        INNER JOIN base_attr_value bav
+        ON ba.id = bav.attr_id
+        WHERE ba.catalog3_id = #{0}
+    </select>
+</mapper>
