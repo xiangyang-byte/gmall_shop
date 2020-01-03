@@ -80,4 +80,25 @@ public interface ManageService {
      * @param skuInfo
      */
     void saveSkuInfo(SkuInfo skuInfo);
+
+    /**
+     * 通过skuId获取商品详情页
+     * @param skuId
+     * @return
+     */
+    SkuInfo getSkuInfoPage(String skuId);
+
+    /**
+     * 通过skuInfo查询销售属性信息
+     * @param skuInfo
+     * @return
+     */
+    List<SpuSaleAttr> getSpuSaleAttrListCheckBySku(SkuInfo skuInfo);
+
+    /**
+     * 通过spuId查询销售属性值集合
+     * @param spuId
+     * @return
+     */
+    List<SkuSaleAttrValue> getSkuSaleAttrValueListBySpu(String spuId);
 }

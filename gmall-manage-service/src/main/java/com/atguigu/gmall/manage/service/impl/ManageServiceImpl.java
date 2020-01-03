@@ -2,10 +2,14 @@ package com.atguigu.gmall.manage.service.impl;
 
 import com.alibaba.dubbo.config.annotation.Service;
 import com.atguigu.gmall.bean.*;
+import com.atguigu.gmall.manage.constant.ManageConst;
 import com.atguigu.gmall.manage.mapper.*;
 import com.atguigu.gmall.service.ManageService;
+import com.atguigu.gmall.util.RedisUtil;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.transaction.annotation.Transactional;
+import redis.clients.jedis.Jedis;
+import tk.mybatis.mapper.entity.Example;
 
 import javax.annotation.Resource;
 import java.util.List;
@@ -54,6 +58,9 @@ public class ManageServiceImpl implements ManageService {
 
     @Resource
     private SkuSaleAttrValueMapper skuSaleAttrValueMapper;
+
+    @Autowired
+    private RedisUtil redisUtil;
 
     //http://localhost:8082/getCatalog1
     @Override
@@ -214,6 +221,37 @@ public class ManageServiceImpl implements ManageService {
         }
 
 
+    }
+
+    @Override
+    public SkuInfo getSkuInfoPage(String skuId) {
+        //获取jedis
+        Jedis jedis = redisUtil.getJedis();
+        //定义key
+        String skuKey = ManageConst.SKUKEY_PREFIX+skuId+ManageConst.SKUKEY_SUFFIX;
+
+        return getSkuInfoDB(skuId);
+    }
+
+    private SkuInfo getSkuInfoDB(String skuId) {
+        //查询出skuInfo,库存表
+        SkuInfo skuInfo = skuInfoMapper.selectByPrimaryKey(skuId);
+        //获取商品详情页的图片。
+        SkuImage skuImage = new SkuImage();
+        skuImage.setSkuId(skuId);
+        List<SkuImage> skuImageList = skuImageMapper.select(skuImage);
+        skuInfo.setSkuImageList(skuImageList);
+        return skuInfo;
+    }
+
+    @Override
+    public List<SpuSaleAttr> getSpuSaleAttrListCheckBySku(SkuInfo skuInfo) {
+        return spuSaleAttrMapper.selectSpuSaleAttrListCheckBySku(skuInfo.getId(),skuInfo.getSpuId());
+    }
+
+    @Override
+    public List<SkuSaleAttrValue> getSkuSaleAttrValueListBySpu(String spuId) {
+        return skuSaleAttrValueMapper.selectSkuSaleAttrValueListBySpu(spuId);
     }
 
 }
