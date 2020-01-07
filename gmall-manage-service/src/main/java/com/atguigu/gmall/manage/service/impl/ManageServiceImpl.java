@@ -1,11 +1,18 @@
 package com.atguigu.gmall.manage.service.impl;
 
 import com.alibaba.dubbo.config.annotation.Service;
+import com.alibaba.fastjson.JSON;
 import com.atguigu.gmall.bean.*;
 import com.atguigu.gmall.manage.constant.ManageConst;
 import com.atguigu.gmall.manage.mapper.*;
 import com.atguigu.gmall.service.ManageService;
 import com.atguigu.gmall.util.RedisUtil;
+import lombok.SneakyThrows;
+import org.apache.commons.lang3.StringUtils;
+import org.redisson.Redisson;
+import org.redisson.api.RLock;
+import org.redisson.api.RedissonClient;
+import org.redisson.config.Config;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.transaction.annotation.Transactional;
 import redis.clients.jedis.Jedis;
@@ -13,6 +20,7 @@ import tk.mybatis.mapper.entity.Example;
 
 import javax.annotation.Resource;
 import java.util.List;
+import java.util.concurrent.TimeUnit;
 
 @Service
 public class ManageServiceImpl implements ManageService {
@@ -225,11 +233,62 @@ public class ManageServiceImpl implements ManageService {
 
     @Override
     public SkuInfo getSkuInfoPage(String skuId) {
-        //获取jedis
-        Jedis jedis = redisUtil.getJedis();
-        //定义key
-        String skuKey = ManageConst.SKUKEY_PREFIX+skuId+ManageConst.SKUKEY_SUFFIX;
+        SkuInfo skuInfo = null;
+        Jedis jedis = null;
+        try {
 
+            //获取jedis
+            jedis = redisUtil.getJedis();
+            //定义key
+            String skuKey = ManageConst.SKUKEY_PREFIX+skuId+ManageConst.SKUKEY_SUFFIX;
+
+            String skuJson = jedis.get(skuKey);
+            //判断skuJson是否为空，
+            if(skuJson == null){
+                //如果为空则从数据库中查询
+                //创建config
+                Config config = new Config();
+                config.useSingleServer().setAddress("redis://192.168.19.131:6379");
+                //创建redisson实例
+                RedissonClient redissonClient = Redisson.create(config);
+                //创建锁
+                RLock lock = redissonClient.getLock("my-lock");
+                System.out.println("分布式锁");
+
+                //lock.lock();
+                boolean res = lock.tryLock(100, 10, TimeUnit.SECONDS);
+                if(res){
+                    try {
+                        // 业务逻辑
+                        // 缓存中没有数据
+                        skuInfo =  getSkuInfoDB(skuId);
+                        // 判断skuInfo是否为空
+                        if (skuInfo==null){
+                            jedis.setex(skuKey,ManageConst.SKUKEY_TIMEOUT, "");  // key value = null
+                        }
+                        // 将数据放入缓存
+                        jedis.setex(skuKey,ManageConst.SKUKEY_TIMEOUT, JSON.toJSONString(skuInfo));
+                        return skuInfo;
+                    } finally {
+                        lock.unlock();
+                    }
+                }
+
+
+            }else{
+                //从缓存中获取
+                skuInfo = JSON.parseObject(skuJson, SkuInfo.class);
+                return skuInfo;
+            }
+        } catch (Exception e) {
+            e.printStackTrace();
+        } finally {
+            //关闭缓存
+            if(jedis != null){
+                jedis.close();
+            }
+
+        }
         return getSkuInfoDB(skuId);
     }
 
@@ -241,6 +300,11 @@ public class ManageServiceImpl implements ManageService {
         skuImage.setSkuId(skuId);
         List<SkuImage> skuImageList = skuImageMapper.select(skuImage);
         skuInfo.setSkuImageList(skuImageList);
+        //查询销售属性值信息
+        SkuAttrValue skuAttrValue = new SkuAttrValue();
+        skuAttrValue.setSkuId(skuId);
+        List<SkuAttrValue> skuAttrValueList = skuAttrValueMapper.select(skuAttrValue);
+        skuInfo.setSkuAttrValueList(skuAttrValueList);
         return skuInfo;
     }
 
@@ -252,6 +316,14 @@ public class ManageServiceImpl implements ManageService {
     @Override
     public List<SkuSaleAttrValue> getSkuSaleAttrValueListBySpu(String spuId) {
         return skuSaleAttrValueMapper.selectSkuSaleAttrValueListBySpu(spuId);
+    }
+
+    @Override
+    public List<BaseAttrInfo> getAttrValue(List<String> attrValueIdList) {
+
+        String attrValueIds = StringUtils.join(attrValueIdList.toArray(), ',');
+        List<BaseAttrInfo> baseAttrInfos =  baseAttrInfoMapper.selectAttrInfoListByIds(attrValueIds);
+        return baseAttrInfos;
     }
 
 }

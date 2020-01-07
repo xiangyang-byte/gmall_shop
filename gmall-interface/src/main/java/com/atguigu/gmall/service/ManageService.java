@@ -101,4 +101,11 @@ public interface ManageService {
      * @return
      */
     List<SkuSaleAttrValue> getSkuSaleAttrValueListBySpu(String spuId);
+
+    /**
+     * 获取平台属性信息
+     * @param attrValueIdList
+     * @return
+     */
+    List<BaseAttrInfo> getAttrValue(List<String> attrValueIdList);
 }
